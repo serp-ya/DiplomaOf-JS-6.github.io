@@ -135,18 +135,22 @@ class Level {
         if (!(position instanceof Vector) && !(size instanceof Vector)) {
             throw new Error("Level: obstacleAt's arguments is wrong");
         }
-        let checkedActor = new Actor(position, size);
-        if (checkedActor.left < 0 ||
-            checkedActor.right > this.width ||
-            checkedActor.top < 0) {
+
+        const leftBorder = Math.floor(position.x);
+        const rightBorder = Math.ceil(position.x + size.x);
+        const topBorder = Math.floor(position.y);
+        const bottomBorder = Math.ceil(position.y + size.y);
+
+        if (leftBorder < 0 || rightBorder > this.width || topBorder < 0) {
             return 'wall';
-        } else if (checkedActor.bottom > this.height) {
+        } else if (bottomBorder > this.height) {
             return 'lava';
         }
 
-        for (let y = Math.ceil(checkedActor.top); y < Math.ceil(checkedActor.bottom); y++) {
-            for (let x = Math.ceil(checkedActor.left); x < Math.ceil(checkedActor.right); x++) {
-                if (this.grid[y][x] === 'wall' || 'lava') return this.grid[y][x];
+        for (let y = topBorder; y < bottomBorder; y++) {
+            for (let x = leftBorder; x < rightBorder; x++) {
+                const cell = this.grid[y][x];
+                if (cell) return cell;
             }
         }
         return undefined;
@@ -200,9 +204,9 @@ class LevelParser {
     createGrid(plan) {
         let grid = [];
         if (!(plan instanceof Actor)) {
-            for (let string of plan) {
+            for (let lines of plan) {
                 let result = [];
-                [...string].forEach((symbol) => result.push(this.obstacleFromSymbol(symbol)));
+                [...lines].forEach((symbol) => result.push(this.obstacleFromSymbol(symbol)));
                 grid.push(result);
             }
         }
@@ -298,6 +302,7 @@ class Coin extends Actor {
         super(pos, new Vector(0.6, 0.6));
         this.pos.x += 0.2;
         this.pos.y += 0.1;
+        this.startPos = this.pos;
         this.spring = Math.random() * (Math.PI * 2);
         this.springDist = 0.07;
         this.springSpeed = 8;
@@ -317,11 +322,11 @@ class Coin extends Actor {
 
     getNextPosition(time = 1) {
         this.updateSpring(time);
-        return this.pos.plus(this.getSpringVector());
+        return this.startPos.plus(this.getSpringVector());
         // переиодически заваливается только 1 тест в моке, а именно:
         // "Координата y новой позиции будет в пределах исходного
         // значения y и y + 1"...
-        // Найти ошибку не смог, но комментарий теста такой:
+        // Найти ошибку не смог, но комментарий проваленного теста такой:
         // AssertionError: expected 5.083119355177926 to be within 5.1..6.1,
     }
 
@@ -333,10 +338,24 @@ class Coin extends Actor {
 class Player extends Actor {
     constructor(pos) {
         super(pos, new Vector(0.8, 1.5));
-        this.pos.y -= 0.5
+        this.pos.y -= 0.5;
     }
 
     get type() {
         return 'player';
     }
 }
+
+const actorDict = {
+    '@': Player,
+    'v': FireRain,
+    'o': Coin,
+    '=': HorizontalFireball,
+    '|': VerticalFireball
+};
+
+const parser = new LevelParser(actorDict);
+
+loadLevels()
+    .then((res) => {runGame(JSON.parse(res), parser, DOMDisplay)
+    .then(() => alert('Вы выиграли!'))});
