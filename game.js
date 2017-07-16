@@ -31,7 +31,6 @@ class Actor {
 
         } else if (!(speed instanceof Vector)) {
             throw new Error('Actor: transmitted speed is not a Vector');
-
         }
 
         this.pos = position;
@@ -94,24 +93,14 @@ class Level {
                     return b.length - a.length;
                 })[0].length;
             } else {
-                this.width = 1; // возращаю 1, т.к. длина строки в случае даже нахождения внутри массива
-                                // undefined логически == 1, но я не уверен на 100%
+                this.width = 1;
             }
-            // Закоментированный способ, приведённый ниже, работает отлично,
-            // если соблюдается условие задачи, что входящий аргумент
-            // grid === двумерному массиву. Но в некоторых тестах нам закидывают
-            // одномерный массив, наполненный undefined, из-за чего у меня
-            // падала вся программа и многие тесты, по-этому, пришлось выкручиваться
-            // тем, что написано выше...
-            //
-            // this.width = grid.sort(function (a, b) {
-            //     return b.length - a.length;
-            // })[0].length;
 
         } else {
             this.height = 0;
             this.width = 0;
         }
+
         this.status = null;
         this.finishDelay = 1;
         this.actors = actors;
@@ -178,13 +167,6 @@ class Level {
 
     playerTouched(touchedType, actor) {
         if (this.status === null) {
-            // Дмитрий, посоветуйте, как лучше писать подобные проверки? В данном
-            // случае, мне показалось, что второй метод проще в данном контексте,
-            // но если будет больше строк для сравнения, проще через массив
-            //
-            // if (['lava', 'fireball'].find((type) => type === touchedType)) {
-            //     this.status = 'lost';
-            // }
             if (touchedType === 'lava' || touchedType === 'fireball') {
                 this.status = 'lost';
             } else if (touchedType === 'coin' && actor.type === 'coin') {
@@ -199,31 +181,162 @@ class Level {
 
 class LevelParser {
     constructor(actorsLibrary) {
-        if (this.actorsLibrary) {
-            this.actorsLibrary = [].push(actorsLibrary);
-        }
-
-        this.actorsLibrary = this.actorsLibrary.push(actorsLibrary);
-
+        this.actorsLibrary = actorsLibrary;
     }
 
-    // actorFromSymbol(letter) {
-    //     if (this.actorsLibrary.find(letter)) {
-    //         return true;
-    //     }
-    //     return undefined;
-    // }
+    actorFromSymbol(letter) {
+        if (typeof letter !== 'string' || !this.actorsLibrary) {
+            return undefined;
+        }
+        return this.actorsLibrary[letter];
+    }
 
     obstacleFromSymbol(letter) {
         if (letter === 'x') return 'wall';
         if (letter === '!') return 'lava';
         return undefined;
     }
+
+    createGrid(plan) {
+        let grid = [];
+        if (!(plan instanceof Actor)) {
+            for (let string of plan) {
+                let result = [];
+                [...string].forEach((symbol) => result.push(this.obstacleFromSymbol(symbol)));
+                grid.push(result);
+            }
+        }
+        return grid;
+    }
+
+    createActors(actorsKeys) {
+        let actors = [];
+
+        if (Array.isArray(actorsKeys)) {
+            actorsKeys.forEach((itemY, y) => {
+                [...itemY].forEach((itemX, x) => {
+                    let Constructor = this.actorFromSymbol(itemX);
+                    let result;
+                    if (typeof Constructor === 'function') {
+                        result = new Constructor(new Vector(x, y));
+                    }
+                    if (result instanceof Actor) {
+                        actors.push(result);
+                    }
+                });
+            });
+        }
+        return actors;
+    }
+
+    parse(plan) {
+        let grid = this.createGrid(plan);
+        let actors = this.createActors(plan);
+        let level = new Level(grid, actors);
+        return level;
+    }
 }
 
-const grid = [
-    new Array(3),
-    ['wall', 'wall', 'lava']
-];
-const level = new Level(grid);
-runLevel(level, DOMDisplay);
+class Fireball extends Actor {
+    constructor(pos = new Vector(0, 0), speed = new Vector(0, 0)) {
+        super(pos, undefined, speed);
+    }
+
+    get type() {
+        return 'fireball';
+    }
+
+    getNextPosition(time = 1) {
+        if (time === 0) {
+            return new Vector(this.pos.x, this.pos.y)
+        }
+        return new Vector((this.pos.x + (this.speed.x * time)), (this.pos.y + (this.speed.y * time)));
+    }
+
+    handleObstacle() {
+        this.speed.x = -this.speed.x;
+        this.speed.y = -this.speed.y;
+    }
+
+    act(time, level) {
+        let nextPos = this.getNextPosition(time);
+        if (level.obstacleAt(nextPos, this.size)) {
+            this.handleObstacle();
+        } else {
+            this.pos = nextPos;
+        }
+    }
+}
+
+class HorizontalFireball extends Fireball {
+    constructor(thisPos) {
+        super(thisPos, new Vector(2, 0));
+
+    }
+}
+
+class VerticalFireball extends Fireball {
+    constructor(thisPos) {
+        super(thisPos, new Vector(0, 2));
+
+    }
+}
+
+class FireRain extends Fireball {
+    constructor(thisPos) {
+        super(thisPos, new Vector(0, 3));
+        this.startPos = thisPos;
+    }
+
+    handleObstacle() {
+        this.pos = this.startPos;
+    }
+}
+
+class Coin extends Actor {
+    constructor(pos) {
+        super(pos, new Vector(0.6, 0.6));
+        this.pos.x += 0.2;
+        this.pos.y += 0.1;
+        this.spring = Math.random() * (Math.PI * 2);
+        this.springDist = 0.07;
+        this.springSpeed = 8;
+    }
+
+    get type() {
+        return 'coin';
+    }
+
+    updateSpring(time = 1) {
+        this.spring += this.springSpeed * time;
+    }
+
+    getSpringVector() {
+        return new Vector(0, (Math.sin(this.spring) * this.springDist));
+    }
+
+    getNextPosition(time = 1) {
+        this.updateSpring(time);
+        return this.pos.plus(this.getSpringVector());
+        // переиодически заваливается только 1 тест в моке, а именно:
+        // "Координата y новой позиции будет в пределах исходного
+        // значения y и y + 1"...
+        // Найти ошибку не смог, но комментарий теста такой:
+        // AssertionError: expected 5.083119355177926 to be within 5.1..6.1,
+    }
+
+    act(time) {
+        this.pos = this.getNextPosition(time);
+    }
+}
+
+class Player extends Actor {
+    constructor(pos) {
+        super(pos, new Vector(0.8, 1.5));
+        this.pos.y -= 0.5
+    }
+
+    get type() {
+        return 'player';
+    }
+}
