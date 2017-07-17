@@ -155,8 +155,7 @@ class Level {
 
     removeActor(actor) {
         let thatActorIndex = this.actors.indexOf(actor);
-        this.actors[thatActorIndex] = null;
-        this.actors = this.actors.filter((thatActor) => thatActor !== null);
+        this.actors.splice(thatActorIndex, 1);
     }
 
     noMoreActors(type) {
