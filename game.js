@@ -38,9 +38,7 @@ class Actor {
         this.speed = speed;
     }
 
-    act() {
-        return null;
-    }
+    act() {}
 
     get type() {
         return 'actor';
@@ -71,13 +69,12 @@ class Actor {
             return false;
 
         // MDN 2D Game development - collision detect example
-        } else if (thisActor.pos.x < (anotherActor.pos.x + anotherActor.size.y) &&
+        } else if (thisActor.pos.x < (anotherActor.pos.x + anotherActor.size.x) &&
             (thisActor.pos.x + thisActor.size.x) > anotherActor.pos.x &&
             thisActor.pos.y < (anotherActor.pos.y + anotherActor.size.y) &&
             (thisActor.size.y + thisActor.pos.y) > anotherActor.pos.y) {
             return true;
         }
-
         return false;
     }
 }
@@ -275,14 +272,12 @@ class Fireball extends Actor {
 class HorizontalFireball extends Fireball {
     constructor(thisPos) {
         super(thisPos, new Vector(2, 0));
-
     }
 }
 
 class VerticalFireball extends Fireball {
     constructor(thisPos) {
         super(thisPos, new Vector(0, 2));
-
     }
 }
 
@@ -323,11 +318,6 @@ class Coin extends Actor {
     getNextPosition(time = 1) {
         this.updateSpring(time);
         return this.startPos.plus(this.getSpringVector());
-        // переиодически заваливается только 1 тест в моке, а именно:
-        // "Координата y новой позиции будет в пределах исходного
-        // значения y и y + 1"...
-        // Найти ошибку не смог, но комментарий проваленного теста такой:
-        // AssertionError: expected 5.083119355177926 to be within 5.1..6.1,
     }
 
     act(time) {
